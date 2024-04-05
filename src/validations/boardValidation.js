@@ -8,9 +8,8 @@ const createNew = async (req, res, next) => {
     description: Joi.string().required().min(3).max(255).trim().strict()
   })
   try {
-    console.log('req.body: ', req.body)
     await correctCondition.validateAsync(req.body, { abortEarly: false })
-    res.status(StatusCodes.CREATED).json({ message: 'POST from validation: API create new board' })
+    next()
   } catch (error) {
     console.log(error)
     res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
