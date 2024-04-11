@@ -8,8 +8,8 @@ const Router = express.Router()
 
 Router.route('/')
   .get((req, res) => {
-    res.status(StatusCodes.OK).json({ message: 'GET: API get list boards' })
+    res.status(StatusCodes.OK).json({ message: 'GET: API get list movies' })
   })
   .post(boardValidation.createNew, boardController.createNew)
 
-export const boardRoute = Router
+export const movieRoute = Router
