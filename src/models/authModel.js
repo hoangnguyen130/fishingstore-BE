@@ -31,11 +31,21 @@ const check = async ({ email }) => {
     throw new Error(error)
   }
 }
-
+const findOneById = async (id) => {
+  try {
+    const result = await GET_DB().collection(AUTH_COLLECTION_NAME).findOne({
+      _id: id
+    })
+    return result
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 
 export const authModel = {
   AUTH_COLLECTION_NAME,
   AUTH_COLLECTION_SCHEMA,
   register,
-  check
+  check,
+  findOneById
 }

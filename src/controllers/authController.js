@@ -4,6 +4,7 @@ import { authModel } from '~/models/authModel'
 
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { authService } from '~/services/authService'
 
 
 const register = async (req, res, next) => {
@@ -14,8 +15,8 @@ const register = async (req, res, next) => {
         message: 'Email da duoc dang ky'
       })
     }
-    const hashPass = await bcrypt.hash(req.body.password, 10)
-    const createUser = await authModel.register({ ...req.body, password: hashPass })
+    // const hashPass = await bcrypt.hash(req.body.password, 10)
+    const createUser = await authService.register(req.body)
 
     req.body.password = undefined
     res.status(StatusCodes.CREATED).json({ createUser })
