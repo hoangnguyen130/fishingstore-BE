@@ -1,6 +1,6 @@
 import express from 'express'
 import { StatusCodes } from 'http-status-codes'
-import { movieRoute } from './movieRoute'
+import { postRoute } from './postRoute'
 import { authRoute } from './authRoute'
 import { typeRoute } from './typeRoute'
 
@@ -10,7 +10,7 @@ Router.get('/status', (req, res) => {
   res.status(StatusCodes.OK).json({ message: 'APIs V1 are ready to use' })
 })
 
-Router.use('/movies', movieRoute)
+Router.use('/posts', postRoute)
 
 Router.use('/auth', authRoute)
 

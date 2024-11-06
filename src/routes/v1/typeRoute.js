@@ -1,5 +1,5 @@
 import express from 'express'
-import { StatusCodes } from 'http-status-codes'
+// import { StatusCodes } from 'http-status-codes'
 import { typeController } from '~/controllers/typeController'
 import { typeValidation } from '~/validations/typeValidation'
 
@@ -11,7 +11,7 @@ Router.route('/')
 //     res.status(StatusCodes.OK)
 //   })
 
-  .get(typeController.getMovies)
+  .get(typeController.getPosts)
   .post(typeValidation.createNew, typeController.createNew)
 
 export const typeRoute = Router

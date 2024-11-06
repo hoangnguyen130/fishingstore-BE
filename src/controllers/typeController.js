@@ -8,22 +8,22 @@ import { typeService } from '~/services/typeService'
 const createNew = async (req, res, next) => {
   try {
 
-    const createMovie = await typeService.createNew(req.body)
+    const createPost = await typeService.createNew(req.body)
 
-    res.status(StatusCodes.CREATED).json({ createMovie })
+    res.status(StatusCodes.CREATED).json({ createPost })
   } catch (error) { next(error) }
 }
 
-const getMovies = async (req, res, next) => {
+const getPosts = async (req, res, next) => {
   try {
 
-    const movies = await typeService.getMovies(req.body)
+    const posts = await typeService.getPosts(req.body)
 
-    res.status(StatusCodes.OK).json(movies)
+    res.status(StatusCodes.OK).json(posts)
   } catch (error) { next(error) }
 }
 
 export const typeController = {
   createNew,
-  getMovies
+  getPosts
 }

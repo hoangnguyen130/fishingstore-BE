@@ -2,8 +2,8 @@ import Joi from 'joi'
 import { GET_DB } from '~/config/mongodb'
 import { OBJECT_ID_RULE, OBJECT_ID_RULE_MESSAGE } from '~/utils/validator'
 
-const MOVIE_COLLECTION_NAME = 'types'
-const MOVIE_COLLECTION_SCHEMA = Joi.object({
+const POST_COLLECTION_NAME = 'types'
+const POST_COLLECTION_SCHEMA = Joi.object({
   name: Joi.string().required().min(3).max(50).trim().strict(),
   slug: Joi.string().required().min(3).trim().strict(),
   originName: Joi.string().required().min(3).max(255).trim().strict(),
@@ -20,7 +20,7 @@ const MOVIE_COLLECTION_SCHEMA = Joi.object({
 
 const createNew = async (data) => {
   try {
-    const createdMovie = await GET_DB().collection(MOVIE_COLLECTION_NAME).insertOne(data)
+    const createdMovie = await GET_DB().collection(POST_COLLECTION_NAME).insertOne(data)
     return createdMovie
   } catch (error) {
     throw new Error(error)
@@ -29,7 +29,7 @@ const createNew = async (data) => {
 
 const findOneById = async (id) => {
   try {
-    const result = await GET_DB().collection(MOVIE_COLLECTION_NAME).findOne({
+    const result = await GET_DB().collection(POST_COLLECTION_NAME).findOne({
       _id: id
     })
     return result
@@ -43,8 +43,7 @@ const getMovies = async () => {
     // const result = await GET_DB().collection(MOVIE_COLLECTION_NAME).findOne({
     //   _id: id
     // })
-    const result = await GET_DB().collection(MOVIE_COLLECTION_NAME).findOne()
-    console.log(result)
+    const result = await GET_DB().collection(POST_COLLECTION_NAME).findOne()
     return result
   } catch (error) {
     throw new Error(error)
@@ -52,8 +51,8 @@ const getMovies = async () => {
 }
 
 export const typeModel = {
-  MOVIE_COLLECTION_NAME,
-  MOVIE_COLLECTION_SCHEMA,
+  POST_COLLECTION_NAME,
+  POST_COLLECTION_SCHEMA,
   createNew,
   findOneById,
   getMovies

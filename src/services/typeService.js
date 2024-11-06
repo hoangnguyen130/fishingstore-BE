@@ -15,10 +15,10 @@ const createNew = async (reqBody) => {
   }
 }
 
-const getMovies = async (reqBody) => {
+const getPosts = async (reqBody) => {
   try {
 
-    const types = await typeModel.getMovies(reqBody)
+    const types = await typeModel.getPosts(reqBody)
 
     return types
 
@@ -28,5 +28,5 @@ const getMovies = async (reqBody) => {
 }
 export const typeService = {
   createNew,
-  getMovies
+  getPosts
 }

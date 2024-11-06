@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import { StatusCodes } from 'http-status-codes'
-import { movieService } from '~/services/movieService'
+import { postService } from '~/services/postService'
 
 // import ApiError from '~/utils/ApiError'
 
@@ -8,22 +8,22 @@ import { movieService } from '~/services/movieService'
 const createNew = async (req, res, next) => {
   try {
 
-    const createMovie = await movieService.createNew(req.body)
+    const createPost = await postService.createNew(req.body)
 
-    res.status(StatusCodes.CREATED).json({ createMovie })
+    res.status(StatusCodes.CREATED).json({ createPost })
   } catch (error) { next(error) }
 }
 
-const getMovies = async (req, res, next) => {
+const getPosts = async (req, res, next) => {
   try {
 
-    const movies = await movieService.getMovies(req.body)
+    const movies = await postService.getPosts(req.body)
 
     res.status(StatusCodes.OK).json({ movies })
   } catch (error) { next(error) }
 }
 
-export const movieController = {
+export const postController = {
   createNew,
-  getMovies
+  getPosts
 }
