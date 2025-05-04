@@ -1,51 +1,62 @@
-import Joi from 'joi'
-import { GET_DB } from '~/config/mongodb'
+/* eslint-disable no-console */
+import Joi from 'joi';
+import { GET_DB } from '~/config/mongodb';
 
-const AUTH_COLLECTION_NAME = 'auth'
-const AUTH_COLLECTION_SCHEMA = Joi.object({
-  email: Joi.string().required().min(3).max(50).trim().strict().email(),
-  password: Joi.string().required().min(3).max(255).trim().strict(),
-  userName: Joi.string().required().min(3).max(255).trim().strict(),
+const USER_COLLECTION_NAME = 'users';
 
+const USER_COLLECTION_SCHEMA = Joi.object({
+  userName: Joi.string().trim().required(),
+  email: Joi.string().email().required().trim(),
+  password: Joi.string().min(6).required(),
+  role: Joi.string().valid('user', 'admin').default('user'),
   createdAt: Joi.date().timestamp('javascript').default(Date.now),
-  updatedAt: Joi.date().timestamp('javascript').default(null),
-  _destroy: Joi.boolean().default(false)
-})
+  updatedAt: Joi.date().timestamp('javascript').default(Date.now),
+});
 
-const register = async (data) => {
+const check = async (query) => {
   try {
-    const createdUser = await GET_DB().collection(AUTH_COLLECTION_NAME).insertOne(data)
-    return createdUser
+    const db = await GET_DB();
+    const user = await db.collection(USER_COLLECTION_NAME).findOne(query);
+    return user;
   } catch (error) {
-    throw new Error(error)
+    console.error('Error in check:', error.message, error.stack);
+    throw new Error(error.message);
   }
-}
+};
 
-const check = async ({ email }) => {
+const create = async (data) => {
   try {
-    const result = await GET_DB().collection(AUTH_COLLECTION_NAME).findOne({
-      email: email
-    })
-    return result
+    const db = await GET_DB();
+    const { error, value } = USER_COLLECTION_SCHEMA.validate(data);
+    if (error) {
+      console.error('create: Validation error:', error.details);
+      throw new Error(error.details[0].message);
+    }
+
+    const result = await db.collection(USER_COLLECTION_NAME).insertOne(value);
+    const user = await db.collection(USER_COLLECTION_NAME).findOne({ _id: result.insertedId });
+    return user;
   } catch (error) {
-    throw new Error(error)
+    console.error('Error in create:', error.message, error.stack);
+    throw new Error(error.message);
   }
-}
-const findOneById = async (id) => {
+};
+
+const findAll = async () => {
   try {
-    const result = await GET_DB().collection(AUTH_COLLECTION_NAME).findOne({
-      _id: id
-    })
-    return result
+    const db = await GET_DB();
+    const users = await db.collection(USER_COLLECTION_NAME).find({}).toArray();
+    return users;
   } catch (error) {
-    throw new Error(error)
+    console.error('Error in findAll:', error.message, error.stack);
+    throw new Error(error.message);
   }
-}
+};
 
 export const authModel = {
-  AUTH_COLLECTION_NAME,
-  AUTH_COLLECTION_SCHEMA,
-  register,
+  USER_COLLECTION_NAME,
+  USER_COLLECTION_SCHEMA,
   check,
-  findOneById
-}
+  create,
+  findAll,
+};

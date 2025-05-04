@@ -1,35 +1,27 @@
-/* eslint-disable no-useless-catch */
-import { authModel } from '~/models/authModel'
-import bcrypt from 'bcryptjs'
+/* eslint-disable no-console */
+import bcrypt from 'bcryptjs';
+import { authModel } from '~/models/authModel';
 
-
-const register = async (reqBody) => {
+const register = async (data) => {
   try {
-    const hashPass = await bcrypt.hash(reqBody.password, 10)
-
-    const createdUser = await authModel.register({ ...reqBody, password: hashPass })
-
-    const getNewUser = await authModel.findOneById(createdUser.insertedId)
-
-    return getNewUser
-
+    const { userName, email, password, role = 'user' } = data;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await authModel.create({
+      userName,
+      email,
+      password: hashedPassword,
+      role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    console.log('register: Tạo người dùng thành công:', { email, role });
+    return user;
   } catch (error) {
-    throw error
+    console.error('Error in register:', error.message, error.stack);
+    throw new Error(error.message);
   }
-}
+};
 
-const login = async (reqBody) => {
-  try {
-
-    const auths = await authModel.login(reqBody)
-
-    return auths
-
-  } catch (error) {
-    throw error
-  }
-}
 export const authService = {
   register,
-  login
-}
+};

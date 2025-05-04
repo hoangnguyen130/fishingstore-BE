@@ -5,9 +5,9 @@ import ApiError from '~/utils/ApiError'
 
 const register = async (req, res, next) => {
   const correctCondition = Joi.object({
+    userName: Joi.string().required().min(3).max(255).trim().strict(),
     email: Joi.string().required().min(3).max(50).trim().strict().email(),
-    password: Joi.string().required().min(3).max(255).trim().strict(),
-    userName: Joi.string().required().min(3).max(255).trim().strict()
+    password: Joi.string().required().min(3).max(255).trim().strict()
   })
   try {
     await correctCondition.validateAsync(req.body, { abortEarly: false })
