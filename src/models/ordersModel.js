@@ -2,6 +2,7 @@
 import Joi from 'joi';
 import { ObjectId } from 'mongodb';
 import { GET_DB } from '~/config/mongodb';
+import { productsModel } from './productsModel';
 
 const ORDER_COLLECTION_NAME = 'orders';
 
@@ -53,9 +54,43 @@ const createOrder = async (userId, cartItems, total, shippingInfo) => {
       throw new Error(error.details[0].message);
     }
 
+    // 1. Kiểm tra số lượng sản phẩm trước khi tạo đơn hàng
+    for (const item of cartItems) {
+      const product = await db.collection(productsModel.PRODUCT_COLLECTION_NAME).findOne(
+        { _id: new ObjectId(item.productId) }
+      );
+
+      if (!product) {
+        throw new Error(`Không tìm thấy sản phẩm với ID: ${item.productId}`);
+      }
+
+      if (product.quantity < item.quantity) {
+        throw new Error(`Sản phẩm ${product.productName} chỉ còn ${product.quantity} sản phẩm`);
+      }
+    }
+
+    // 2. Tạo đơn hàng
     console.log('createOrder: Tạo đơn hàng:', { userId: value.userId, total: value.total });
     const result = await db.collection(ORDER_COLLECTION_NAME).insertOne(value);
     const order = await db.collection(ORDER_COLLECTION_NAME).findOne({ _id: result.insertedId });
+
+    // 3. Cập nhật số lượng sản phẩm
+    for (const item of cartItems) {
+      const updateResult = await db.collection(productsModel.PRODUCT_COLLECTION_NAME).updateOne(
+        { 
+          _id: new ObjectId(item.productId),
+          quantity: { $gte: item.quantity } // Đảm bảo số lượng vẫn đủ sau khi kiểm tra
+        },
+        { $inc: { quantity: -item.quantity } }
+      );
+
+      if (updateResult.matchedCount === 0) {
+        // Nếu không cập nhật được (số lượng không đủ), xóa đơn hàng và throw error
+        await db.collection(ORDER_COLLECTION_NAME).deleteOne({ _id: result.insertedId });
+        throw new Error('Sản phẩm đã hết hàng hoặc số lượng không đủ');
+      }
+    }
+
     return order;
   } catch (error) {
     console.error('Error in createOrder:', error.message, error.stack);

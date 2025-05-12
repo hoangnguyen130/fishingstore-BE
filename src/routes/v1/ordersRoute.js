@@ -51,4 +51,13 @@ Router.route('/admin/:id/reject')
   // .put(authMiddleware, restrictToAdmin, ordersController.rejectOrder);
   .put(authMiddleware, ordersController.rejectOrder);
 
+// Hoàn thành đơn hàng (admin)
+Router.route('/admin/:id/completed')
+  // .put(authMiddleware, restrictToAdmin, ordersController.completeOrder);
+  .put(authMiddleware, ordersController.completeOrder);
+
+// Hủy đơn hàng (user)
+Router.route('/cancel/:id')
+  .put(authMiddleware, ordersController.cancelOrder);
+
 export const ordersRoute = Router;

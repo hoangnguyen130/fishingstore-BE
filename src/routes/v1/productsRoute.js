@@ -14,6 +14,12 @@ Router.route('/get')
 Router.route('/get/:id')
   .get(productsController.getProductById)
 
+Router.route('/update/:id')
+  .put(authMiddleware, upload.array('images', 5), productsController.updateProduct)
+
+Router.route('/delete/:id')
+  .delete(authMiddleware, productsController.deleteProduct)
+
 Router.route('/cart/add')
   .post(authMiddleware, productsController.addToCart)
 

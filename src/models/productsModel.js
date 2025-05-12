@@ -63,7 +63,6 @@ const createNew = async (req, res) => {
 const getProducts = async (req, res) => {
   try {
     const products = await GET_DB().collection(PRODUCT_COLLECTION_NAME).find({}).toArray()
-    console.log('Fetched products:', products)
     return res.status(200).json(products)
   } catch (error) {
     console.error('Error in getProducts:', error.message, error.stack)
@@ -73,24 +72,24 @@ const getProducts = async (req, res) => {
 const getProductById = async (productId) => {
   try {
     if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
-      console.error('getProductById: Invalid productId format:', productId);
-      throw new Error('productId không hợp lệ');
+      console.error('getProductById: Invalid productId format:', productId)
+      throw new Error('productId không hợp lệ')
     }
-    console.log('getProductById: Truy vấn sản phẩm:', { productId });
-    const db = await GET_DB();
+    console.log('getProductById: Truy vấn sản phẩm:', { productId })
+    const db = await GET_DB()
     const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
-      _id: new ObjectId(productId),
-    });
+      _id: new ObjectId(productId)
+    })
     if (!product) {
-      console.error('getProductById: Product not found:', productId);
-      throw new Error('Sản phẩm không tồn tại');
+      console.error('getProductById: Product not found:', productId)
+      throw new Error('Sản phẩm không tồn tại')
     }
-    return product;
+    return product
   } catch (error) {
-    console.error('Error in getProductById:', error.message, error.stack);
-    throw new Error(error.message);
+    console.error('Error in getProductById:', error.message, error.stack)
+    throw new Error(error.message)
   }
-};
+}
 const addToCart = async (userId, productId, quantity) => {
   try {
     // Validate input
@@ -360,6 +359,127 @@ const searchProducts = async (searchTerm) => {
     throw new Error(error.message)
   }
 }
+
+const updateProduct = async (productId, updateData) => {
+  try {
+    if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
+      throw new Error('productId không hợp lệ')
+    }
+
+    const db = await GET_DB()
+    const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    })
+
+    if (!product) {
+      throw new Error('Sản phẩm không tồn tại')
+    }
+
+    // Create validation object without _id
+    const validationObject = {
+      productName: updateData.productName,
+      description: updateData.description,
+      type: updateData.type,
+      price: Number(updateData.price),
+      quantity: Number(updateData.quantity),
+      images: updateData.images || product.images,
+      createdAt: product.createdAt,
+      updatedAt: new Date(),
+      _destroy: product._destroy
+    }
+
+    console.log('Validation object:', validationObject)
+
+    // Validate update data
+    const { error } = PRODUCT_COLLECTION_SCHEMA.validate(validationObject)
+
+    if (error) {
+      console.error('Validation error:', error.details)
+      throw new Error(`Validation failed: ${error.details[0].message}`)
+    }
+
+    // Prepare update data
+    const updateFields = {
+      productName: updateData.productName,
+      description: updateData.description,
+      type: updateData.type,
+      price: Number(updateData.price),
+      quantity: Number(updateData.quantity),
+      updatedAt: new Date()
+    }
+
+    // Only update images if new ones are provided
+    if (updateData.images) {
+      updateFields.images = updateData.images
+    }
+
+    console.log('Update fields:', updateFields)
+
+    // Update the product
+    const result = await db.collection(PRODUCT_COLLECTION_NAME).updateOne(
+      { _id: new ObjectId(productId) },
+      { $set: updateFields }
+    )
+
+    console.log('Update result:', result)
+
+    if (result.matchedCount === 0) {
+      throw new Error('Không tìm thấy sản phẩm để cập nhật')
+    }
+
+    if (result.modifiedCount === 0) {
+      throw new Error('Không có thay đổi nào được thực hiện')
+    }
+
+    // Fetch and return the updated product
+    const updatedProduct = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    })
+
+    if (!updatedProduct) {
+      throw new Error('Không thể lấy thông tin sản phẩm sau khi cập nhật')
+    }
+
+    return updatedProduct
+  } catch (error) {
+    console.error('Error in updateProduct:', error.message, error.stack)
+    throw error
+  }
+}
+
+const deleteProduct = async (productId) => {
+  try {
+    if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
+      throw new Error('productId không hợp lệ')
+    }
+
+    const db = await GET_DB()
+    const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    })
+
+    if (!product) {
+      throw new Error('Sản phẩm không tồn tại')
+    }
+
+    // Soft delete by setting _destroy flag
+    const result = await db.collection(PRODUCT_COLLECTION_NAME).findOneAndUpdate(
+      { _id: new ObjectId(productId) },
+      { $set: { _destroy: true, updatedAt: new Date() } },
+      { returnDocument: 'after' }
+    )
+
+    if (!result.value) {
+      throw new Error('Không thể xóa sản phẩm')
+    }
+
+    return result.value
+  } catch (error) {
+    console.error('Error in deleteProduct:', error.message, error.stack)
+    throw error
+  }
+}
+
 export const productsModel = {
   PRODUCT_COLLECTION_NAME,
   PRODUCT_COLLECTION_SCHEMA,
@@ -368,6 +488,8 @@ export const productsModel = {
   createNew,
   getProducts,
   getProductById,
+  updateProduct,
+  deleteProduct,
   addToCart,
   getCart,
   updateCartItem,

@@ -127,10 +127,182 @@ const getAllUser = async (req, res, next) => {
   }
 };
 
+const getProfile = async (req, res) => {
+  try {
+    const { userId } = req.query; // Get userId from query params
+    
+    if (!userId) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'Vui lòng cung cấp ID người dùng',
+      });
+    }
+
+    const user = await authModel.findById(userId);
+    
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        message: 'Không tìm thấy thông tin người dùng',
+      });
+    }
+
+    // Remove sensitive information
+    user.password = undefined;
+    
+    res.status(StatusCodes.OK).json({
+      user: {
+        userName: user.userName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        address: user.address || '',
+        avatar: user.avatar || '',
+        role: user.role || 'user'
+      }
+    });
+  } catch (error) {
+    console.error('Error in getProfile:', error.message, error.stack);
+    
+    if (error.message === 'Invalid user ID format') {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'ID người dùng không hợp lệ',
+      });
+    }
+    
+    if (error.message === 'User not found') {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        message: 'Không tìm thấy thông tin người dùng',
+      });
+    }
+
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: 'Lỗi server khi lấy thông tin người dùng', 
+      error: error.message 
+    });
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const { userName, email, phone, address } = req.body;
+    const avatar = req.file;
+
+    console.log('Update Profile Request:', {
+      userId,
+      body: req.body,
+      file: req.file
+    });
+
+    if (!userId) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'Vui lòng cung cấp ID người dùng',
+      });
+    }
+
+    try {
+      // Check if user exists
+      const existingUser = await authModel.findById(userId);
+      console.log('Existing user:', existingUser);
+
+      if (!existingUser) {
+        return res.status(StatusCodes.NOT_FOUND).json({
+          message: 'Không tìm thấy người dùng',
+        });
+      }
+
+      // Prepare update data
+      const updateData = {};
+      if (userName) updateData.userName = userName;
+      if (email) {
+        // Check if email is already taken by another user
+        if (email !== existingUser.email) {
+          const userWithEmail = await authModel.check({ email });
+          if (userWithEmail && userWithEmail._id.toString() !== userId) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+              message: 'Email đã được sử dụng bởi người dùng khác',
+            });
+          }
+        }
+        updateData.email = email;
+      }
+      if (phone) updateData.phone = phone;
+      if (address) updateData.address = address;
+      if (avatar) {
+        // Handle avatar path
+        const avatarPath = avatar.path.replace(/\\/g, '/');
+        updateData.avatar = avatarPath;
+      }
+
+      console.log('Update Data:', updateData);
+
+      // Update user profile
+      const updatedUser = await authModel.update(userId, updateData);
+      console.log('Updated User:', updatedUser);
+
+      // Remove sensitive information
+      updatedUser.password = undefined;
+
+      // Ensure we have all required fields
+      const responseData = {
+        message: 'Cập nhật thông tin thành công',
+        user: {
+          userName: updatedUser.userName || '',
+          email: updatedUser.email || '',
+          phone: updatedUser.phone || '',
+          address: updatedUser.address || '',
+          avatar: updatedUser.avatar || '',
+          role: updatedUser.role || 'user'
+        }
+      };
+
+      console.log('Sending response:', responseData);
+      res.status(StatusCodes.OK).json(responseData);
+    } catch (dbError) {
+      console.error('Database operation error:', dbError);
+      
+      if (dbError.message === 'User ID không hợp lệ') {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'ID người dùng không hợp lệ',
+        });
+      }
+      
+      if (dbError.message === 'Không tìm thấy người dùng để cập nhật') {
+        return res.status(StatusCodes.NOT_FOUND).json({
+          message: 'Không tìm thấy người dùng',
+        });
+      }
+
+      if (dbError.message.startsWith('Dữ liệu cập nhật không hợp lệ:')) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: dbError.message,
+        });
+      }
+
+      if (dbError.message === 'Cập nhật thông tin thất bại') {
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+          message: 'Cập nhật thông tin thất bại',
+        });
+      }
+
+      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        message: 'Lỗi khi thao tác với cơ sở dữ liệu',
+        error: dbError.message
+      });
+    }
+  } catch (error) {
+    console.error('Error in updateProfile:', error.message, error.stack);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: 'Lỗi server khi cập nhật thông tin', 
+      error: error.message 
+    });
+  }
+};
+
 export const authController = {
   register,
   registerAdmin,
   login,
   googleLogin,
   getAllUser,
+  getProfile,
+  updateProfile,
 };

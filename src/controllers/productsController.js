@@ -1,8 +1,10 @@
+/* eslint-disable no-unused-vars */
+/* eslint-disable comma-dangle */
 /* eslint-disable no-console */
 import { StatusCodes } from 'http-status-codes'
 import { productsModel } from '~/models/productsModel'
 
-const createNew = async (req, res, next) => {
+const createNew = async (req, res, _next) => {
   try {
     const { productName, description, type, price, quantity } = req.body
 
@@ -35,7 +37,7 @@ const createNew = async (req, res, next) => {
   }
 }
 
-const getProducts = async (req, res, next) => {
+const getProducts = async (req, res, _next) => {
   try {
     const products = await productsModel.getProducts(req, res)
     return products
@@ -44,11 +46,11 @@ const getProducts = async (req, res, next) => {
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi lấy sản phẩm', error: error.message })
   }
 }
-const getProductById = async (req, res, next) => {
+const getProductById = async (req, res, _next) => {
   try {
-    const { id } = req.params;
-    const product = await productsModel.getProductById(id);
-    console.log('getProductById: Truy vấn sản phẩm thành công:', { productId: id });
+    const { id } = req.params
+    const product = await productsModel.getProductById(id)
+    console.log('getProductById: Truy vấn sản phẩm thành công:', { productId: id })
     return res.status(StatusCodes.OK).json({
       message: 'Lấy chi tiết sản phẩm thành công',
       product: {
@@ -56,25 +58,26 @@ const getProductById = async (req, res, next) => {
         name: product.productName,
         type: product.type,
         price: product.price,
+        quantity: product.quantity,
         image: product.images,
         description: product.description,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
       },
-    });
+    })
   } catch (error) {
-    console.error('Error in getProductById:', error.message, error.stack);
+    console.error('Error in getProductById:', error.message, error.stack)
     if (error.message.includes('productId không hợp lệ')) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'ID sản phẩm không hợp lệ' });
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'ID sản phẩm không hợp lệ' })
     }
     if (error.message.includes('Sản phẩm không tồn tại')) {
-      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Sản phẩm không tồn tại' });
+      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Sản phẩm không tồn tại' })
     }
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi lấy chi tiết sản phẩm', error: error.message });
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi lấy chi tiết sản phẩm', error: error.message })
   }
-};
+}
 
-const addToCart = async (req, res, next) => {
+const addToCart = async (req, res, _next) => {
   try {
     const { productId, quantity } = req.body
 
@@ -97,7 +100,7 @@ const addToCart = async (req, res, next) => {
   }
 }
 
-const getCart = async (req, res, next) => {
+const getCart = async (req, res, _next) => {
   try {
     const userId = req.userId
     if (!userId) {
@@ -119,7 +122,7 @@ const getCart = async (req, res, next) => {
   }
 }
 
-const updateCartItem = async (req, res, next) => {
+const updateCartItem = async (req, res, _next) => {
   try {
     const { productId, quantity } = req.body
 
@@ -145,7 +148,7 @@ const updateCartItem = async (req, res, next) => {
   }
 }
 
-const removeCartItem = async (req, res, next) => {
+const removeCartItem = async (req, res, _next) => {
   try {
     const { productId } = req.body
 
@@ -170,7 +173,7 @@ const removeCartItem = async (req, res, next) => {
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi xóa sản phẩm khỏi giỏ hàng', error: error.message })
   }
 }
-const searchProducts = async (req, res, next) => {
+const searchProducts = async (req, res, _next) => {
   try {
     const { q } = req.query
     if (!q || typeof q !== 'string' || q.trim() === '') {
@@ -190,11 +193,84 @@ const searchProducts = async (req, res, next) => {
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi tìm kiếm sản phẩm', error: error.message })
   }
 }
+
+const updateProduct = async (req, res, _next) => {
+  try {
+    const { id } = req.params
+    const { productName, description, type, price, quantity } = req.body
+
+    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'ID sản phẩm không hợp lệ' })
+    }
+
+    // Validate required fields
+    if (!productName || !description || !type || !price || !quantity) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' })
+    }
+
+    // Prepare update data
+    const updateData = {
+      productName,
+      description,
+      type,
+      price: Number(price),
+      quantity: Number(quantity),
+      updatedAt: new Date()
+    }
+
+    // Handle image updates if new images are uploaded
+    if (req.files && req.files.length > 0) {
+      updateData.images = req.files.map((file) => `http://localhost:3001/uploads/${file.filename}`)
+    }
+
+    const result = await productsModel.updateProduct(id, updateData)
+    return res.status(StatusCodes.OK).json({
+      message: 'Cập nhật sản phẩm thành công',
+      data: result
+    })
+  } catch (error) {
+    console.error('Error in updateProduct:', error.message, error.stack)
+    if (error.message.includes('Sản phẩm không tồn tại')) {
+      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Sản phẩm không tồn tại' })
+    }
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      message: 'Lỗi server khi cập nhật sản phẩm',
+      error: error.message
+    })
+  }
+}
+
+const deleteProduct = async (req, res, _next) => {
+  try {
+    const { id } = req.params
+
+    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'ID sản phẩm không hợp lệ' })
+    }
+
+    const result = await productsModel.deleteProduct(id)
+    return res.status(StatusCodes.OK).json({
+      message: 'Xóa sản phẩm thành công',
+      data: result
+    })
+  } catch (error) {
+    console.error('Error in deleteProduct:', error.message, error.stack)
+    if (error.message.includes('Sản phẩm không tồn tại')) {
+      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Sản phẩm không tồn tại' })
+    }
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      message: 'Lỗi server khi xóa sản phẩm',
+      error: error.message
+    })
+  }
+}
+
 export const productsController = {
   createNew,
   getProducts,
   getProductById,
-  // findOneById,
+  updateProduct,
+  deleteProduct,
   addToCart,
   getCart,
   updateCartItem,
