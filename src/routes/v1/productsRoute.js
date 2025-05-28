@@ -35,4 +35,11 @@ Router.route('/cart/remove')
 Router.route('/search')
   .get(productsController.searchProducts)
 
+Router.route('/types')
+  .post(authMiddleware, productsController.addProductType)
+  .get(productsController.getProductTypes)
+
+Router.route('/discount')
+  .post(authMiddleware, productsController.applyDiscount)
+
 export const productsRoute = Router

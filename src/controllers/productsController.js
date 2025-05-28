@@ -265,6 +265,75 @@ const deleteProduct = async (req, res, _next) => {
   }
 }
 
+const addProductType = async (req, res, _next) => {
+  try {
+    const { typeName, description } = req.body
+
+    if (!typeName) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Vui lòng cung cấp tên loại sản phẩm' })
+    }
+
+    const typeData = {
+      typeName,
+      description: description || ''
+    }
+
+    const result = await productsModel.addProductType(typeData)
+    return res.status(StatusCodes.CREATED).json({
+      message: 'Thêm loại sản phẩm thành công',
+      data: result
+    })
+  } catch (error) {
+    console.error('Error in addProductType:', error.message, error.stack)
+    if (error.message.includes('Loại sản phẩm đã tồn tại')) {
+      return res.status(StatusCodes.CONFLICT).json({ message: error.message })
+    }
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: 'Lỗi server khi thêm loại sản phẩm', 
+      error: error.message 
+    })
+  }
+}
+
+const getProductTypes = async (req, res, _next) => {
+  try {
+    const types = await productsModel.getProductTypes()
+    return res.status(StatusCodes.OK).json({
+      message: 'Lấy danh sách loại sản phẩm thành công',
+      data: types
+    })
+  } catch (error) {
+    console.error('Error in getProductTypes:', error.message, error.stack)
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: 'Lỗi server khi lấy danh sách loại sản phẩm', 
+      error: error.message 
+    })
+  }
+}
+
+const applyDiscount = async (req, res) => {
+  try {
+    const { productId, discountPercentage } = req.body
+
+    if (!productId || !discountPercentage) {
+      return res.status(400).json({
+        message: 'Vui lòng cung cấp productId và discountPercentage'
+      })
+    }
+
+    const result = await productsModel.applyDiscount(productId, discountPercentage)
+    return res.status(200).json({
+      message: 'Áp dụng giảm giá thành công',
+      data: result
+    })
+  } catch (error) {
+    console.error('Error in applyDiscount controller:', error)
+    return res.status(500).json({
+      message: error.message || 'Lỗi khi áp dụng giảm giá'
+    })
+  }
+}
+
 export const productsController = {
   createNew,
   getProducts,
@@ -275,5 +344,8 @@ export const productsController = {
   getCart,
   updateCartItem,
   removeCartItem,
-  searchProducts
+  searchProducts,
+  addProductType,
+  getProductTypes,
+  applyDiscount
 }

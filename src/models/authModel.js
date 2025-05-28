@@ -157,6 +157,65 @@ const update = async (userId, updateData) => {
   }
 };
 
+const changePassword = async (userId, currentPassword, newPassword) => {
+  try {
+    if (!userId || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+      throw new Error('User ID không hợp lệ');
+    }
+
+    if (!currentPassword || !newPassword) {
+      throw new Error('Mật khẩu hiện tại và mật khẩu mới là bắt buộc');
+    }
+
+    const db = await GET_DB();
+    
+    // Find user and verify current password
+    const user = await db.collection(USER_COLLECTION_NAME).findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      throw new Error('Không tìm thấy người dùng');
+    }
+
+    // Here you should verify the current password matches
+    // Note: In a real application, you would compare hashed passwords
+    if (user.password !== currentPassword) {
+      throw new Error('Mật khẩu hiện tại không đúng');
+    }
+
+    // Validate new password
+    const { error } = USER_COLLECTION_SCHEMA.validate({ 
+      ...user,
+      password: newPassword
+    }, { 
+      abortEarly: false,
+      stripUnknown: true
+    });
+
+    if (error) {
+      throw new Error(`Mật khẩu mới không hợp lệ: ${error.details[0].message}`);
+    }
+
+    // Update password
+    const result = await db.collection(USER_COLLECTION_NAME).updateOne(
+      { _id: new ObjectId(userId) },
+      { 
+        $set: { 
+          password: newPassword,
+          updatedAt: new Date()
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error('Không tìm thấy người dùng để cập nhật');
+    }
+
+    return { message: 'Đổi mật khẩu thành công' };
+  } catch (error) {
+    console.error('Error in changePassword:', error.message, error.stack);
+    throw error;
+  }
+};
+
 export const authModel = {
   USER_COLLECTION_NAME,
   USER_COLLECTION_SCHEMA,
@@ -165,4 +224,5 @@ export const authModel = {
   findAll,
   findById,
   update,
+  changePassword,
 };

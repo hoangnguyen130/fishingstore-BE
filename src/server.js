@@ -17,6 +17,7 @@ const START_SERVER = () => {
 
   const io = socketIo(server, {
     cors: {
+      // origin: 'https://fishing-shop-henna.vercel.app',
       origin: 'http://localhost:3000',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -25,6 +26,7 @@ const START_SERVER = () => {
   })
 
   app.use(cors({
+    // origin: 'https://fishing-shop-henna.vercel.app',
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -39,12 +41,12 @@ const START_SERVER = () => {
   app.use(errorHandlingMiddleware)
 
   io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id)
+    // console.log('A user connected:', socket.id)
 
     // Join a chat room
     socket.on('join_chat', (userId) => {
       socket.join(userId)
-      console.log(`User ${userId} joined their chat room`)
+      // console.log(`User ${userId} joined their chat room`)
     })
 
     socket.on('send_message', async (data) => {

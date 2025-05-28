@@ -9,7 +9,7 @@ const CART_COLLECTION_NAME = 'carts'
 const PRODUCT_COLLECTION_SCHEMA = Joi.object({
   productName: Joi.string().trim().strict().required(),
   description: Joi.string().trim().strict().required(),
-  type: Joi.string().valid('cần câu', 'đồ câu', 'phụ kiện', 'mồi câu').trim().strict().required(),
+  type: Joi.string().trim().strict().required(),
   price: Joi.number().precision(2).required(),
   quantity: Joi.number().integer().min(0).required(),
   images: Joi.alternatives().try(
@@ -33,6 +33,16 @@ const CART_COLLECTION_SCHEMA = Joi.object({
     })
   ).default([]),
   updatedAt: Joi.date().timestamp('javascript').default(Date.now)
+})
+
+const PRODUCT_TYPES_COLLECTION_NAME = 'productTypes'
+
+const PRODUCT_TYPE_SCHEMA = Joi.object({
+  typeName: Joi.string().trim().strict().required(),
+  description: Joi.string().trim().strict().optional(),
+  createdAt: Joi.date().timestamp('javascript').default(Date.now),
+  updatedAt: Joi.date().timestamp('javascript').default(null),
+  _destroy: Joi.boolean().default(false)
 })
 
 const createNew = async (req, res) => {
@@ -480,11 +490,109 @@ const deleteProduct = async (productId) => {
   }
 }
 
+const addProductType = async (typeData) => {
+  try {
+    const { error, value } = PRODUCT_TYPE_SCHEMA.validate(typeData)
+    if (error) {
+      console.error('Joi validation error:', error.details)
+      throw new Error(error.details[0].message)
+    }
+
+    const db = await GET_DB()
+    
+    // Check if type already exists
+    const existingType = await db.collection(PRODUCT_TYPES_COLLECTION_NAME).findOne({
+      typeName: value.typeName,
+      _destroy: false
+    })
+
+    if (existingType) {
+      throw new Error('Loại sản phẩm đã tồn tại')
+    }
+
+    const result = await db.collection(PRODUCT_TYPES_COLLECTION_NAME).insertOne(value)
+    return result
+  } catch (error) {
+    console.error('Error in addProductType:', error.message, error.stack)
+    throw error
+  }
+}
+
+const getProductTypes = async () => {
+  try {
+    const db = await GET_DB()
+    const types = await db.collection(PRODUCT_TYPES_COLLECTION_NAME)
+      .find({ _destroy: false })
+      .toArray()
+    return types
+  } catch (error) {
+    console.error('Error in getProductTypes:', error.message, error.stack)
+    throw error
+  }
+}
+
+const applyDiscount = async (productId, discountPercentage) => {
+  try {
+    if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
+      throw new Error('productId không hợp lệ')
+    }
+
+    if (!discountPercentage || discountPercentage < 1 || discountPercentage > 100) {
+      throw new Error('Phần trăm giảm giá phải từ 1 đến 100')
+    }
+
+    const db = await GET_DB()
+    const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    })
+
+    if (!product) {
+      throw new Error('Sản phẩm không tồn tại')
+    }
+
+    // Calculate discounted price
+    const originalPrice = product.price
+    const discountedPrice = originalPrice * (1 - discountPercentage / 100)
+
+    // Update product with discount
+    const result = await db.collection(PRODUCT_COLLECTION_NAME).updateOne(
+      { _id: new ObjectId(productId) },
+      { 
+        $set: { 
+          discountPercentage,
+          discountedPrice,
+          updatedAt: new Date()
+        }
+      }
+    )
+
+    if (result.matchedCount === 0) {
+      throw new Error('Không tìm thấy sản phẩm để cập nhật')
+    }
+
+    // Fetch and return the updated product
+    const updatedProduct = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    })
+
+    if (!updatedProduct) {
+      throw new Error('Không thể lấy thông tin sản phẩm sau khi cập nhật')
+    }
+
+    return updatedProduct
+  } catch (error) {
+    console.error('Error in applyDiscount:', error.message, error.stack)
+    throw error
+  }
+}
+
 export const productsModel = {
   PRODUCT_COLLECTION_NAME,
   PRODUCT_COLLECTION_SCHEMA,
   CART_COLLECTION_NAME,
   CART_COLLECTION_SCHEMA,
+  PRODUCT_TYPES_COLLECTION_NAME,
+  PRODUCT_TYPE_SCHEMA,
   createNew,
   getProducts,
   getProductById,
@@ -494,5 +602,8 @@ export const productsModel = {
   getCart,
   updateCartItem,
   removeCartItem,
-  searchProducts
+  searchProducts,
+  addProductType,
+  getProductTypes,
+  applyDiscount
 }

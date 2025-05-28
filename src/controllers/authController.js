@@ -297,6 +297,72 @@ const updateProfile = async (req, res) => {
   }
 };
 
+const changePassword = async (req, res) => {
+  try {
+    // Get userId from token
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({
+        message: 'Không tìm thấy token xác thực',
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'hoangdeptrai');
+    const userId = decoded.userId;
+
+    if (!userId) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'Không tìm thấy thông tin người dùng',
+      });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'Vui lòng cung cấp mật khẩu hiện tại và mật khẩu mới',
+      });
+    }
+
+    // Get user to verify current password
+    const user = await authModel.findById(userId);
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        message: 'Không tìm thấy người dùng',
+      });
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'Mật khẩu hiện tại không đúng',
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await authModel.changePassword(userId, user.password, hashedPassword);
+
+    res.status(StatusCodes.OK).json({
+      message: 'Đổi mật khẩu thành công',
+    });
+  } catch (error) {
+    console.error('Error in changePassword:', error.message, error.stack);
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(StatusCodes.UNAUTHORIZED).json({
+        message: 'Token không hợp lệ',
+      });
+    }
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      message: 'Lỗi server khi đổi mật khẩu',
+      error: error.message,
+    });
+  }
+};
+
 export const authController = {
   register,
   registerAdmin,
@@ -305,4 +371,5 @@ export const authController = {
   getAllUser,
   getProfile,
   updateProfile,
+  changePassword,
 };

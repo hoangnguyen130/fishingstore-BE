@@ -69,4 +69,8 @@ Router.route('/profile')
 Router.route('/profile/update')
   .put(authMiddleware, upload.single('avatar'), authController.updateProfile);
 
+// Đổi mật khẩu
+Router.route('/change-password')
+  .put(authMiddleware, authController.changePassword);
+
 export const authRoute = Router;
