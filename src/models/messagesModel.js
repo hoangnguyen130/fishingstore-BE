@@ -167,4 +167,91 @@ export const getMessage = async (id) => {
   }
 }
 
+// Get users who have chatted with admin
+export const getUsersChattedWithAdmin = async (adminId) => {
+  try {
+    const db = await GET_DB()
+    const messagesCollection = db.collection(MESSAGE_COLLECTION_NAME)
+    const usersCollection = db.collection(USER_COLLECTION_NAME)
+
+    // Get all messages where admin is either sender or receiver
+    const messages = await messagesCollection.find({
+      $or: [
+        { id_user1: adminId },
+        { id_user2: adminId }
+      ]
+    }).toArray()
+
+    // Extract unique user IDs who have chatted with admin
+    const userIds = new Set()
+    messages.forEach(message => {
+      if (message.id_user1 === adminId) {
+        userIds.add(message.id_user2)
+      } else {
+        userIds.add(message.id_user1)
+      }
+    })
+
+    // Get user details for each user ID
+    const users = await usersCollection.find({
+      _id: { $in: Array.from(userIds).map(id => new ObjectId(id)) }
+    }).toArray()
+
+    // Add last message and unread count for each user
+    const usersWithChatInfo = await Promise.all(users.map(async (user) => {
+      // Get the last message between admin and this user
+      const lastMessage = await messagesCollection.findOne(
+        {
+          $or: [
+            { id_user1: adminId, id_user2: user._id.toString() },
+            { id_user1: user._id.toString(), id_user2: adminId }
+          ]
+        },
+        { 
+          sort: { lastUpdated: -1 }
+        }
+      )
+
+      // Count unread messages from this user to admin
+      const unreadCount = await messagesCollection.aggregate([
+        {
+          $match: {
+            id_user1: user._id.toString(),
+            id_user2: adminId
+          }
+        },
+        {
+          $unwind: '$content'
+        },
+        {
+          $match: {
+            'content.read': false
+          }
+        },
+        {
+          $count: 'count'
+        }
+      ]).toArray()
+
+      return {
+        _id: user._id.toString(),
+        userName: user.userName,
+        email: user.email,
+        lastMessage: lastMessage?.content[lastMessage.content.length - 1] || null,
+        unreadCount: unreadCount[0]?.count || 0
+      }
+    }))
+
+    // Sort users by last message timestamp
+    return usersWithChatInfo.sort((a, b) => {
+      if (!a.lastMessage) return 1
+      if (!b.lastMessage) return -1
+      return new Date(b.lastMessage.timestamp) - new Date(a.lastMessage.timestamp)
+    })
+  } catch (err) {
+    console.error('Error getting users who chatted with admin:', err)
+    throw err
+  }
+}
+
 

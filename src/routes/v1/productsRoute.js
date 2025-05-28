@@ -42,4 +42,7 @@ Router.route('/types')
 Router.route('/discount')
   .post(authMiddleware, productsController.applyDiscount)
 
+Router.route('/remove-discount')
+  .post(authMiddleware, productsController.removeDiscount)
+
 export const productsRoute = Router

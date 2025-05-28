@@ -228,7 +228,7 @@ const updateProfile = async (req, res) => {
       if (address) updateData.address = address;
       if (avatar) {
         // Handle avatar path
-        const avatarPath = avatar.path.replace(/\\/g, '/');
+        const avatarPath = `http://localhost:3001/uploads/avatars/${avatar.filename}`;
         updateData.avatar = avatarPath;
       }
 

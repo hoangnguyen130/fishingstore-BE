@@ -586,6 +586,52 @@ const applyDiscount = async (productId, discountPercentage) => {
   }
 }
 
+const removeDiscount = async (productId) => {
+  try {
+    if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
+      throw new Error('productId không hợp lệ');
+    }
+
+    const db = await GET_DB();
+    const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    });
+
+    if (!product) {
+      throw new Error('Sản phẩm không tồn tại');
+    }
+
+    const result = await db.collection(PRODUCT_COLLECTION_NAME).updateOne(
+      { _id: new ObjectId(productId) },
+      { 
+        $set: { 
+          discountPercentage: 0,
+          discountedPrice: product.price, // Reset to original price
+          updatedAt: new Date()
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error('Không tìm thấy sản phẩm để cập nhật');
+    }
+
+    // Fetch and return the updated product
+    const updatedProduct = await db.collection(PRODUCT_COLLECTION_NAME).findOne({
+      _id: new ObjectId(productId)
+    });
+
+    if (!updatedProduct) {
+      throw new Error('Không thể lấy thông tin sản phẩm sau khi cập nhật');
+    }
+
+    return updatedProduct;
+  } catch (error) {
+    console.error('Error in removeDiscount:', error.message, error.stack);
+    throw new Error(error.message || 'Lỗi khi xóa giảm giá');
+  }
+};
+
 export const productsModel = {
   PRODUCT_COLLECTION_NAME,
   PRODUCT_COLLECTION_SCHEMA,
@@ -605,5 +651,6 @@ export const productsModel = {
   searchProducts,
   addProductType,
   getProductTypes,
-  applyDiscount
+  applyDiscount,
+  removeDiscount
 }

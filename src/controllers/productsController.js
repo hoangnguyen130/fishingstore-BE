@@ -334,6 +334,29 @@ const applyDiscount = async (req, res) => {
   }
 }
 
+const removeDiscount = async (req, res) => {
+  try {
+    const { productId } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        message: 'Vui lòng cung cấp productId'
+      });
+    }
+
+    const result = await productsModel.removeDiscount(productId);
+    return res.status(200).json({
+      message: 'Xóa giảm giá thành công',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error in removeDiscount controller:', error);
+    return res.status(500).json({
+      message: error.message || 'Lỗi khi xóa giảm giá'
+    });
+  }
+};
+
 export const productsController = {
   createNew,
   getProducts,
@@ -347,5 +370,6 @@ export const productsController = {
   searchProducts,
   addProductType,
   getProductTypes,
-  applyDiscount
+  applyDiscount,
+  removeDiscount
 }

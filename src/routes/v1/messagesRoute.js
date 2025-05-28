@@ -1,18 +1,21 @@
 import express from 'express'
-import { postMessage, fetchMessages, getUnreadCount, getAdminInfo } from '~/controllers/messagesController'
+import { 
+  postMessage, 
+  fetchMessages, 
+  getUnreadCount, 
+  getAdminInfo,
+  getAdminChatUsers 
+} from '~/controllers/messagesController'
 
 const Router = express.Router()
 
-// Route to get admin info
+// Admin routes
 Router.get('/admin', getAdminInfo)
+Router.get('/admin-chat/:adminId', getAdminChatUsers)
 
-// Route to post a message
+// Message routes
 Router.post('/', postMessage)
-
-// Route to fetch messages between two users
 Router.get('/:userId1/:userId2', fetchMessages)
-
-// Route to get unread message count for a user
 Router.get('/unread/:userId', getUnreadCount)
 
 export const messagesRoute = Router
