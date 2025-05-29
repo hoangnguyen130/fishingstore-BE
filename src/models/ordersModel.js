@@ -14,6 +14,9 @@ const ORDER_COLLECTION_SCHEMA = Joi.object({
       quantity: Joi.number().integer().min(1).required(),
       productName: Joi.string().optional(),
       price: Joi.number().optional(),
+      originalPrice: Joi.number().required(),
+      discountedPrice: Joi.number().optional(),
+      discountPercentage: Joi.number().optional(),
       image: Joi.string().optional(),
     })
   ).required(),
@@ -39,8 +42,17 @@ const createOrder = async (userId, cartItems, total, shippingInfo) => {
     const db = await GET_DB();
     const { error, value } = ORDER_COLLECTION_SCHEMA.validate({
       userId: userId.toString(),
-      items: cartItems,
-      total,
+      items: cartItems.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        productName: item.productName || '',
+        originalPrice: item.originalPrice,
+        discountedPrice: item.discountPercentage > 0 ? item.discountedPrice : item.originalPrice,
+        discountPercentage: item.discountPercentage || 0,
+        image: item.image || '',
+      })),
+      total: cartItems.reduce((sum, item) => 
+        sum + (item.discountPercentage > 0 ? item.discountedPrice : item.originalPrice) * item.quantity, 0),
       status: 'pending',
       statusHistory: [{ status: 'pending', timestamp: Date.now() }],
       paymentMethod: 'cod',

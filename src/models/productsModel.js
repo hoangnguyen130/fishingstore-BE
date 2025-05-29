@@ -28,7 +28,9 @@ const CART_COLLECTION_SCHEMA = Joi.object({
       productId: Joi.string().required(),
       quantity: Joi.number().integer().min(1).required(),
       productName: Joi.string().optional(),
-      price: Joi.number().optional(),
+      originalPrice: Joi.number().required(),
+      discountPercentage: Joi.number().min(0).max(100).default(0),
+      discountedPrice: Joi.number().required(),
       image: Joi.string().optional()
     })
   ).default([]),
@@ -70,15 +72,16 @@ const createNew = async (req, res) => {
   }
 }
 
-const getProducts = async (req, res) => {
+const getProducts = async () => {
   try {
     const products = await GET_DB().collection(PRODUCT_COLLECTION_NAME).find({}).toArray()
-    return res.status(200).json(products)
+    return products
   } catch (error) {
     console.error('Error in getProducts:', error.message, error.stack)
-    return res.status(500).json({ message: 'Failed to fetch products', error: error.message })
+    throw new Error('Failed to fetch products')
   }
 }
+
 const getProductById = async (productId) => {
   try {
     if (!productId || !/^[0-9a-fA-F]{24}$/.test(productId)) {
@@ -94,12 +97,29 @@ const getProductById = async (productId) => {
       console.error('getProductById: Product not found:', productId)
       throw new Error('Sản phẩm không tồn tại')
     }
-    return product
+
+    // Tính toán giá sau giảm giá
+    const originalPrice = product.price
+    const discountPercentage = product.discountPercentage || 0
+    const discountedPrice = discountPercentage > 0 
+      ? originalPrice * (1 - discountPercentage / 100) 
+      : originalPrice
+
+    // Thêm thông tin giá vào sản phẩm
+    const productWithPrices = {
+      ...product,
+      originalPrice,
+      discountPercentage,
+      discountedPrice
+    }
+
+    return productWithPrices
   } catch (error) {
     console.error('Error in getProductById:', error.message, error.stack)
     throw new Error(error.message)
   }
 }
+
 const addToCart = async (userId, productId, quantity) => {
   try {
     // Validate input
@@ -132,6 +152,13 @@ const addToCart = async (userId, productId, quantity) => {
       throw new Error('Sản phẩm không tồn tại')
     }
 
+    // Tính toán giá sau giảm giá
+    const originalPrice = product.price
+    const discountPercentage = product.discountPercentage || 0
+    const discountedPrice = discountPercentage > 0 
+      ? originalPrice * (1 - discountPercentage / 100) 
+      : originalPrice
+
     // Tìm giỏ hàng của người dùng
     const cart = await db.collection(CART_COLLECTION_NAME).findOne({ userId: userId.toString() })
     if (cart) {
@@ -141,7 +168,15 @@ const addToCart = async (userId, productId, quantity) => {
         // Tăng số lượng
         await db.collection(CART_COLLECTION_NAME).updateOne(
           { userId: userId.toString(), 'items.productId': productId },
-          { $inc: { 'items.$.quantity': quantity }, $set: { updatedAt: Date.now() } }
+          { 
+            $inc: { 'items.$.quantity': quantity }, 
+            $set: { 
+              'items.$.originalPrice': originalPrice,
+              'items.$.discountPercentage': discountPercentage,
+              'items.$.discountedPrice': discountedPrice,
+              updatedAt: Date.now() 
+            } 
+          }
         )
       } else {
         // Thêm sản phẩm mới vào giỏ hàng
@@ -153,7 +188,9 @@ const addToCart = async (userId, productId, quantity) => {
                 productId,
                 quantity,
                 productName: product.productName,
-                price: product.price,
+                originalPrice,
+                discountPercentage,
+                discountedPrice,
                 image: Array.isArray(product.images) ? product.images[0] : product.images
               }
             },
@@ -170,7 +207,9 @@ const addToCart = async (userId, productId, quantity) => {
             productId,
             quantity,
             productName: product.productName,
-            price: product.price,
+            originalPrice,
+            discountPercentage,
+            discountedPrice,
             image: Array.isArray(product.images) ? product.images[0] : product.images
           }
         ],
@@ -189,66 +228,47 @@ const addToCart = async (userId, productId, quantity) => {
 
 const getCart = async (userId) => {
   try {
-    // if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-    //   console.error('getCart: userId không hợp lệ:', userId);
-    //   throw new Error('userId không hợp lệ');
-    // }
-
     const db = await GET_DB()
     const cart = await db.collection(CART_COLLECTION_NAME).findOne({ userId: userId.toString() })
-    return cart
+    
+    if (!cart) {
+      return { items: [] }
+    }
+
+    // Lấy thông tin chi tiết sản phẩm và tính giá sau giảm giá
+    const itemsWithDetails = await Promise.all(cart.items.map(async (item) => {
+      const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({ 
+        _id: new ObjectId(item.productId) 
+      })
+
+      if (!product) {
+        return null
+      }
+
+      const originalPrice = product.price
+      const discountPercentage = product.discountPercentage || 0
+      const discountedPrice = discountPercentage > 0 
+        ? originalPrice * (1 - discountPercentage / 100) 
+        : originalPrice
+
+      return {
+        ...item,
+        originalPrice,
+        discountPercentage,
+        discountedPrice,
+        productName: product.productName,
+        image: Array.isArray(product.images) ? product.images[0] : product.images
+      }
+    }))
+
+    // Lọc bỏ các sản phẩm không tồn tại
+    const validItems = itemsWithDetails.filter(item => item !== null)
+
+    return { items: validItems }
   } catch (error) {
     console.error('Error in getCart:', error.message, error.stack)
     throw new Error(error.message)
   }
-
-  // if (!cart) {
-  //   console.log('getCart: Không tìm thấy giỏ hàng, trả về mảng rỗng cho userId:', userId);
-  //   return [];
-  // }
-
-  //   // Kiểm tra và làm sạch items
-  //   let validItems = [];
-  //   if (!Array.isArray(cart.items)) {
-  //     console.warn('getCart: Dữ liệu items không hợp lệ, đặt lại thành mảng rỗng:', cart.items);
-  //     validItems = [];
-  //   } else {
-  //     for (const item of cart.items) {
-  //       if (!item.productId || typeof item.productId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(item.productId)) {
-  //         console.warn('getCart: Bỏ qua productId không hợp lệ:', item.productId);
-  //         continue;
-  //       }
-  //       try {
-  //         const product = await db.collection(PRODUCT_COLLECTION_NAME).findOne({ _id: new ObjectId(item.productId) });
-  //         if (product) {
-  //           validItems.push({
-  //             productId: item.productId,
-  //             quantity: item.quantity,
-  //             productName: product.productName || item.productName || 'Unknown Product',
-  //             price: product.price || item.price || 0,
-  //             image: Array.isArray(product.images) ? product.images[0] : (product.images || item.image || 'https://via.placeholder.com/150'),
-  //           });
-  //         } else {
-  //           console.warn('getCart: Sản phẩm không tồn tại trong products, bỏ qua:', item.productId);
-  //         }
-  //       } catch (error) {
-  //         console.error('getCart: Lỗi khi lấy chi tiết sản phẩm:', error.message, { productId: item.productId });
-  //       }
-  //     }
-  //   }
-
-  //   // Cập nhật giỏ hàng với items hợp lệ
-  //   await db.collection(CART_COLLECTION_NAME).updateOne(
-  //     { userId: userId.toString() },
-  //     { $set: { items: validItems, updatedAt: Date.now() } }
-  //   );
-
-  //   console.log('getCart: Trả về mảng items:', validItems);
-  //   return validItems;
-  // } catch (error) {
-  //   console.error('Error in getCart:', error.message, error.stack);
-  //   throw new Error(error.message);
-  // }
 }
 
 const updateCartItem = async (userId, productId, quantity) => {
@@ -343,6 +363,7 @@ const removeCartItem = async (userId, productId) => {
     throw new Error(error.message)
   }
 }
+
 const searchProducts = async (searchTerm) => {
   try {
     if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim() === '') {

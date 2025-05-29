@@ -39,41 +39,62 @@ const createNew = async (req, res, _next) => {
 
 const getProducts = async (req, res, _next) => {
   try {
-    const products = await productsModel.getProducts(req, res)
-    return products
+    const products = await productsModel.getProducts()
+    
+    // Thêm thông tin giá, ảnh và tên sản phẩm
+    const productsWithPrices = products.map(product => {
+      const originalPrice = product.price
+      const discountPercentage = product.discountPercentage || 0
+      const discountedPrice = discountPercentage > 0 
+        ? originalPrice * (1 - discountPercentage / 100) 
+        : originalPrice
+
+      return {
+        ...product,
+        productId: product._id,
+        productName: product.productName,
+        originalPrice,
+        discountPercentage,
+        discountedPrice,
+        image: Array.isArray(product.images) ? product.images[0] : product.images,
+        images: product.images
+      }
+    })
+
+    return res.status(200).json(productsWithPrices)
   } catch (error) {
-    console.error('Error in getProducts:', error.message, error.stack)
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi lấy sản phẩm', error: error.message })
+    console.error('Error in getProducts:', error)
+    return res.status(500).json({ message: error.message })
   }
 }
+
 const getProductById = async (req, res, _next) => {
   try {
     const { id } = req.params
     const product = await productsModel.getProductById(id)
-    console.log('getProductById: Truy vấn sản phẩm thành công:', { productId: id })
-    return res.status(StatusCodes.OK).json({
-      message: 'Lấy chi tiết sản phẩm thành công',
-      product: {
-        productId: product._id,
-        name: product.productName,
-        type: product.type,
-        price: product.price,
-        quantity: product.quantity,
-        image: product.images,
-        description: product.description,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt,
-      },
-    })
+    
+    // Thêm thông tin giá, ảnh và tên sản phẩm
+    const originalPrice = product.price
+    const discountPercentage = product.discountPercentage || 0
+    const discountedPrice = discountPercentage > 0 
+      ? originalPrice * (1 - discountPercentage / 100) 
+      : originalPrice
+
+    const productWithPrices = {
+      ...product,
+      productId: product._id,
+      productName: product.productName,
+      originalPrice,
+      discountPercentage,
+      discountedPrice,
+      image: Array.isArray(product.images) ? product.images[0] : product.images,
+      images: product.images
+    }
+
+    return res.status(200).json({ product: productWithPrices })
   } catch (error) {
-    console.error('Error in getProductById:', error.message, error.stack)
-    if (error.message.includes('productId không hợp lệ')) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'ID sản phẩm không hợp lệ' })
-    }
-    if (error.message.includes('Sản phẩm không tồn tại')) {
-      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Sản phẩm không tồn tại' })
-    }
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi lấy chi tiết sản phẩm', error: error.message })
+    console.error('Error in getProductById:', error)
+    return res.status(500).json({ message: error.message })
   }
 }
 
@@ -173,70 +194,112 @@ const removeCartItem = async (req, res, _next) => {
     return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi xóa sản phẩm khỏi giỏ hàng', error: error.message })
   }
 }
+
 const searchProducts = async (req, res, _next) => {
   try {
-    const { q } = req.query
+    const { q } = req.query;
+
     if (!q || typeof q !== 'string' || q.trim() === '') {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Vui lòng cung cấp từ khóa tìm kiếm' })
+      return res.status(StatusCodes.BAD_REQUEST).json({ 
+        message: 'Vui lòng nhập từ khóa tìm kiếm' 
+      });
     }
 
-    const products = await productsModel.searchProducts(q)
-    return res.status(StatusCodes.OK).json({
-      message: 'Tìm kiếm sản phẩm thành công',
-      data: products
-    })
-  } catch (error) {
-    console.error('Error in searchProducts:', error.message, error.stack)
-    if (error.message.includes('Từ khóa tìm kiếm không hợp lệ')) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Từ khóa tìm kiếm không hợp lệ' })
+    const searchTerm = q.trim();
+    
+    // Kiểm tra độ dài từ khóa
+
+    if (searchTerm.length > 50) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ 
+        message: 'Từ khóa tìm kiếm không được vượt quá 50 ký tự' 
+      });
     }
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Lỗi server khi tìm kiếm sản phẩm', error: error.message })
+
+    // Kiểm tra nếu là mã sản phẩm (ObjectId)
+    let products;
+    if (/^[0-9a-fA-F]{24}$/.test(searchTerm)) {
+      try {
+        const product = await productsModel.getProductById(searchTerm);
+        products = product ? [product] : [];
+      } catch (error) {
+        products = [];
+      }
+    } else {
+      // Tìm kiếm theo tên hoặc loại sản phẩm
+      products = await productsModel.searchProducts(searchTerm);
+    }
+    
+    // Thêm thông tin giá, ảnh và tên sản phẩm
+    const productsWithPrices = products.map(product => {
+      const originalPrice = product.price;
+      const discountPercentage = product.discountPercentage || 0;
+      const discountedPrice = discountPercentage > 0 
+        ? originalPrice * (1 - discountPercentage / 100) 
+        : originalPrice;
+
+      return {
+        ...product,
+        productId: product._id,
+        productName: product.productName,
+        originalPrice,
+        discountPercentage,
+        discountedPrice,
+        image: Array.isArray(product.images) ? product.images[0] : product.images,
+        images: product.images
+      };
+    });
+
+    if (productsWithPrices.length === 0) {
+      return res.status(StatusCodes.NOT_FOUND).json({ 
+        message: 'Không tìm thấy sản phẩm phù hợp',
+        data: [] 
+      });
+    }
+
+    return res.status(StatusCodes.OK).json({ 
+      message: 'Tìm kiếm thành công',
+      data: productsWithPrices 
+    });
+  } catch (error) {
+    console.error('Error in searchProducts:', error);
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+      message: 'Lỗi server khi tìm kiếm sản phẩm', 
+      error: error.message 
+    });
   }
 }
 
 const updateProduct = async (req, res, _next) => {
   try {
     const { id } = req.params
-    const { productName, description, type, price, quantity } = req.body
+    const updateData = req.body
+    const updatedProduct = await productsModel.updateProduct(id, updateData)
+    
+    // Thêm thông tin giá, ảnh và tên sản phẩm
+    const originalPrice = updatedProduct.price
+    const discountPercentage = updatedProduct.discountPercentage || 0
+    const discountedPrice = discountPercentage > 0 
+      ? originalPrice * (1 - discountPercentage / 100) 
+      : originalPrice
 
-    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'ID sản phẩm không hợp lệ' })
+    const productWithPrices = {
+      ...updatedProduct,
+      productId: updatedProduct._id,
+      productName: updatedProduct.productName,
+      originalPrice,
+      discountPercentage,
+      discountedPrice,
+      image: Array.isArray(updatedProduct.images) ? updatedProduct.images[0] : updatedProduct.images,
+      images: updatedProduct.images
     }
 
-    // Validate required fields
-    if (!productName || !description || !type || !price || !quantity) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' })
-    }
-
-    // Prepare update data
-    const updateData = {
-      productName,
-      description,
-      type,
-      price: Number(price),
-      quantity: Number(quantity),
-      updatedAt: new Date()
-    }
-
-    // Handle image updates if new images are uploaded
-    if (req.files && req.files.length > 0) {
-      updateData.images = req.files.map((file) => `http://localhost:3001/uploads/${file.filename}`)
-    }
-
-    const result = await productsModel.updateProduct(id, updateData)
-    return res.status(StatusCodes.OK).json({
+    return res.status(200).json({ 
       message: 'Cập nhật sản phẩm thành công',
-      data: result
+      product: productWithPrices 
     })
   } catch (error) {
-    console.error('Error in updateProduct:', error.message, error.stack)
-    if (error.message.includes('Sản phẩm không tồn tại')) {
-      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Sản phẩm không tồn tại' })
-    }
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      message: 'Lỗi server khi cập nhật sản phẩm',
-      error: error.message
-    })
+    console.error('Error in updateProduct:', error)
+    return res.status(500).json({ message: error.message })
   }
 }
 
@@ -313,49 +376,65 @@ const getProductTypes = async (req, res, _next) => {
 
 const applyDiscount = async (req, res) => {
   try {
-    const { productId, discountPercentage } = req.body
+    const { id } = req.params
+    const { discountPercentage } = req.body
+    const updatedProduct = await productsModel.applyDiscount(id, discountPercentage)
+    
+    // Thêm thông tin giá, ảnh và tên sản phẩm
+    const originalPrice = updatedProduct.price
+    const discountedPrice = originalPrice * (1 - discountPercentage / 100)
 
-    if (!productId || !discountPercentage) {
-      return res.status(400).json({
-        message: 'Vui lòng cung cấp productId và discountPercentage'
-      })
+    const productWithPrices = {
+      ...updatedProduct,
+      productId: updatedProduct._id,
+      productName: updatedProduct.productName,
+      originalPrice,
+      discountPercentage,
+      discountedPrice,
+      image: Array.isArray(updatedProduct.images) ? updatedProduct.images[0] : updatedProduct.images,
+      images: updatedProduct.images
     }
 
-    const result = await productsModel.applyDiscount(productId, discountPercentage)
-    return res.status(200).json({
+    return res.status(200).json({ 
       message: 'Áp dụng giảm giá thành công',
-      data: result
+      product: productWithPrices 
     })
   } catch (error) {
-    console.error('Error in applyDiscount controller:', error)
-    return res.status(500).json({
-      message: error.message || 'Lỗi khi áp dụng giảm giá'
-    })
+    console.error('Error in applyDiscount:', error)
+    return res.status(500).json({ message: error.message })
   }
 }
 
 const removeDiscount = async (req, res) => {
   try {
-    const { productId } = req.body;
+    const { id } = req.params
+    const updatedProduct = await productsModel.removeDiscount(id)
+    
+    // Thêm thông tin giá, ảnh và tên sản phẩm
+    const originalPrice = updatedProduct.price
+    const discountPercentage = 0
+    const discountedPrice = originalPrice
 
-    if (!productId) {
-      return res.status(400).json({
-        message: 'Vui lòng cung cấp productId'
-      });
+    const productWithPrices = {
+      ...updatedProduct,
+      productId: updatedProduct._id,
+      productName: updatedProduct.productName,
+      originalPrice,
+      discountPercentage,
+      discountedPrice,
+      image: Array.isArray(updatedProduct.images) ? updatedProduct.images[0] : updatedProduct.images,
+      images: updatedProduct.images
     }
 
-    const result = await productsModel.removeDiscount(productId);
-    return res.status(200).json({
+    return res.status(200).json({ 
       message: 'Xóa giảm giá thành công',
-      data: result
-    });
+      product: productWithPrices 
+    })
   } catch (error) {
-    console.error('Error in removeDiscount controller:', error);
-    return res.status(500).json({
-      message: error.message || 'Lỗi khi xóa giảm giá'
-    });
+    console.error('Error in removeDiscount:', error)
+    return res.status(500).json({ message: error.message })
   }
-};
+}
 
 export const productsController = {
   createNew,
